@@ -1,8 +1,11 @@
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import math
 import os
 import pandas
+import psutil
 
 # === 1. Define base polynomial coefficients from Table 1 ===
 # For example, you might create lists of dicts:
@@ -147,15 +150,17 @@ def compute_Kt_Kq_eta(Kt_Terms, Kq_Terms, J, P_D, AE_A0, z, V):
                     Kt_values = []
                     Kq_values = []
                     efficiency = []
+                    J_Values =[]
 
-                    if b != 1: 
-                        return 0, 0, 0    
+                    # if b != 1: 
+                    #     return 0, 0, 0    
 
                     for a in range(len(J)):
                         # x = 15
                         # if x != a:
                         #     continue
                         advance_coefficient = J[a]
+                        
                         RPM = velocity / (advance_coefficient * diameter)
                         if z == 3:
                             chord_length = 2.1475 * (diameter / number_of_blades) * Expanded_Area_Ratio
@@ -179,59 +184,76 @@ def compute_Kt_Kq_eta(Kt_Terms, Kq_Terms, J, P_D, AE_A0, z, V):
                         Kt = Kt0 + dKt
                         Kq = Kq0 + dKq
 
-                        OWE = (advance_coefficient / (2 * 22 / 7)) * (Kt / Kq)
+                        try:
+                            OWE = (advance_coefficient / (2 * 22 / 7)) * (Kt / Kq)
+                        except:
+                            OWE = 0
 
-                        print(f"{b} Re = {Reynolds} Kt = {Kt} Kq = {Kq} efficiency = {OWE} chord length = {chord_length} Rpm = {RPM} advance coefficient = {advance_coefficient} Pitch ratio = {pitch_ratio} Expanded area Ratio = {Expanded_Area_Ratio} blades = {number_of_blades} Velocity = {velocity}")
-                          
+                        if OWE < 0:
+                            b += 1
+
+                            Kt_values.append(Kt)
+                            Kq_values.append(Kq)
+                            efficiency.append(OWE)
+                            J_Values.append(advance_coefficient)
+                            # print(f"{b} Re = {Reynolds} Kt = {Kt} Kq = {Kq} efficiency = {OWE} chord length = {chord_length} Rpm = {RPM} advance coefficient = {advance_coefficient} Pitch ratio = {pitch_ratio} Expanded area Ratio = {Expanded_Area_Ratio} blades = {number_of_blades} Velocity = {velocity}")
+                            print(f"{b} advance coefficient = {advance_coefficient} Pitch ratio = {pitch_ratio} Expanded area Ratio = {Expanded_Area_Ratio} blades = {number_of_blades} Velocity = {velocity}")
+                            
+                            print(psutil.virtual_memory())
+
+                            break
+
+                        # print(f"{b} Re = {Reynolds} Kt = {Kt} Kq = {Kq} efficiency = {OWE} chord length = {chord_length} Rpm = {RPM} advance coefficient = {advance_coefficient} Pitch ratio = {pitch_ratio} Expanded area Ratio = {Expanded_Area_Ratio} blades = {number_of_blades} Velocity = {velocity}")
+                        print(f"{b} advance coefficient = {advance_coefficient} Pitch ratio = {pitch_ratio} Expanded area Ratio = {Expanded_Area_Ratio} blades = {number_of_blades} Velocity = {velocity}")
+                            
+
+                        print(psutil.virtual_memory())
+                        b += 1
 
                         Kt_values.append(Kt)
                         Kq_values.append(Kq)
                         efficiency.append(OWE)
+                        J_Values.append(advance_coefficient)
 
                     # print(Kt_values[14: 16])    
                     # print(Kq_values[14: 16])
                     # print(efficiency[14: 16])
                     
-                    data = {'J' : J, 'Kt' : Kt_values, 'Kq' : Kq_values, 'n_0' : efficiency}
+                    data = {'J' : J_Values, 'Kt' : Kt_values, 'Kq' : Kq_values, 'n_0' : efficiency}
                     df = pandas.DataFrame(data)
                     excel_path = os.path.join(sub_folder, f"J_Kt_Kq_n0_{pitch_ratio}_{Expanded_Area_Ratio}_{number_of_blades}_{velocity}.xlsx")
                     df.to_excel(excel_path, index= False)
 
+                    fig, ax = plt.subplots(figsize=(8, 5))
+                    ax.set_xlim(left= 0, right= 1.6)
+                    ax.set_ylim(bottom= 0, top= 1.5)
 
-                    # Plotting
-                    plt.figure(figsize=(8,5))
-                    plt.plot(J, Kt_values, label=f"K_t (P/D={pitch_ratio}, AE/A0={Expanded_Area_Ratio}, z={number_of_blades})")
-                    # plt.xlabel("Advance coefficient J")
-                    # plt.ylabel("Thrust coefficient K_t")
-                    # plt.title("K_t vs J")
-                    # plt.grid(True)
-                    # plt.legend()
-                    # plt.show()
-
-                    # plt.figure(figsize=(8,5))
-                    plt.plot(J, Kq_values, label=f"K_q (P/D={pitch_ratio}, AE/A0={Expanded_Area_Ratio}, z={number_of_blades})")
-                    plt.xlabel("Advance coefficient J")
-                    plt.ylabel("Torque coefficient K_q")
-                    # plt.title("K_q vs J")
-                    # plt.grid(True)
-                    # plt.legend()
-                    # plt.show()
-
-                    # plt.figure(figsize=(8,5))
-                    plt.plot(J, efficiency, label=f"η₀ (P/D={pitch_ratio}, AE/A0={Expanded_Area_Ratio}, z={number_of_blades})")
-                    # plt.xlabel("Advance coefficient J")
-                    # plt.ylabel("Open-water efficiency η₀")
-                    # plt.title("Efficiency vs J")
-                    plt.grid(True)
-                    plt.legend()
-                    # plt.show()
+                    ax.plot(J_Values, Kt_values, label=f"K_t (P/D={pitch_ratio}, AE/A0={Expanded_Area_Ratio}, z={number_of_blades})")
+                    ax.plot(J_Values, Kq_values, label=f"K_q (P/D={pitch_ratio}, AE/A0={Expanded_Area_Ratio}, z={number_of_blades})")
+                    ax.plot(J_Values, efficiency, label=f"η₀ (P/D={pitch_ratio}, AE/A0={Expanded_Area_Ratio}, z={number_of_blades})")
+                    ax.set_xlabel("Advance Coefficient J")
                     
+                    ax.set_ylabel("Thrust coefficient K_t")
+                    ax.set_ylabel("Torque coefficient K_q")
+                    ax.set_ylabel("Open-water efficiency η₀")
+
+                    ax.legend()
+                    ax.grid(True)
+
+                    ax.minorticks_on()
+
+                    # # Major grid
+                    # ax.grid(which='major', linestyle='-', linewidth=0.75, color='black')
+
+                    # Minor (sub-) grid
+                    ax.grid(which='minor', linestyle=':', linewidth=0.01, color='gray', axis="x")
+                    ax.grid(which='minor', linestyle=':', linewidth=0.05, color='gray', axis="y")
+
                     image_path = os.path.join(sub_folder, f"J_Kt_Kq_n0_{pitch_ratio}_{Expanded_Area_Ratio}_{number_of_blades}_{velocity}.png")
-                    plt.savefig(image_path)
-                    plt.close
-                    
 
-                    # b += 1
+                    fig.savefig(image_path)
+                    plt.close(fig)                  
+
                     pass
                 pass
             pass
@@ -271,7 +293,7 @@ z = [3, 4, 5, 6, 7]
 Expanded_Area_Ratios = [0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05]
 Pitch_ratios = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5]
 velocities = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-J_vals = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.35, 1.4, 1.45, 1.5, 1.55]
+J_vals = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.35, 1.4, 1.45, 1.5, 1.55]
 
 folder_path = "Kt_Kq_Generation"
 os.makedirs(folder_path, exist_ok= True)
@@ -279,5 +301,4 @@ os.makedirs(folder_path, exist_ok= True)
 
 # Compute
 Kt_vals, Kq_vals, eta_vals = compute_Kt_Kq_eta(KT_terms, KQ_terms, J_vals, Pitch_ratios, Expanded_Area_Ratios, z, velocities)
-
 
