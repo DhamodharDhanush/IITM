@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+import os
+import pandas
 
 # === 1. Define base polynomial coefficients from Table 1 ===
 # For example, you might create lists of dicts:
@@ -118,18 +120,30 @@ def compute_Kt_Kq_eta(Kt_Terms, Kq_Terms, J, P_D, AE_A0, z, V):
         # m = 5
         # if l != m:
         #     continue
+        sub_folder = f"Kt_Kq_Generation\Velocity_{velocity}_m_s"
+        os.makedirs(sub_folder, exist_ok= True)
+
         for k in range(len(z)):
             number_of_blades = z[k]
+            sub_folder = f"Kt_Kq_Generation\Velocity_{velocity}_m_s\{number_of_blades}_blades"
+            os.makedirs(sub_folder, exist_ok= True)
+            
+
             for i in range(len(AE_A0)):
                 Expanded_Area_Ratio = AE_A0[i]
                 # y = 10
                 # if i != y:
                 #     continue
+                sub_folder = f"Kt_Kq_Generation\Velocity_{velocity}_m_s\{number_of_blades}_blades\AE_AO_{Expanded_Area_Ratio}"
+                os.makedirs(sub_folder, exist_ok= True)
                 for j in range(len(P_D)):
+                    pitch_ratio = P_D[j]
+                    
+                    sub_folder = f"Kt_Kq_Generation\Velocity_{velocity}_m_s\{number_of_blades}_blades\AE_AO_{Expanded_Area_Ratio}\P_D_{pitch_ratio}"
+                    os.makedirs(sub_folder, exist_ok= True)
                     # n = 10
                     # if j != n:
                     #     continue
-                    pitch_ratio = P_D[j]
                     Kt_values = []
                     Kq_values = []
                     efficiency = []
@@ -177,6 +191,12 @@ def compute_Kt_Kq_eta(Kt_Terms, Kq_Terms, J, P_D, AE_A0, z, V):
                     # print(Kt_values[14: 16])    
                     # print(Kq_values[14: 16])
                     # print(efficiency[14: 16])
+                    
+                    data = {'J' : J, 'Kt' : Kt_values, 'Kq' : Kq_values, 'n_0' : efficiency}
+                    df = pandas.DataFrame(data)
+                    excel_path = os.path.join(sub_folder, f"J_Kt_Kq_n0_{pitch_ratio}_{Expanded_Area_Ratio}_{number_of_blades}_{velocity}.xlsx")
+                    df.to_excel(excel_path, index= False)
+
 
                     # Plotting
                     plt.figure(figsize=(8,5))
@@ -204,8 +224,13 @@ def compute_Kt_Kq_eta(Kt_Terms, Kq_Terms, J, P_D, AE_A0, z, V):
                     # plt.title("Efficiency vs J")
                     plt.grid(True)
                     plt.legend()
-                    plt.show()
+                    # plt.show()
                     
+                    image_path = os.path.join(sub_folder, f"J_Kt_Kq_n0_{pitch_ratio}_{Expanded_Area_Ratio}_{number_of_blades}_{velocity}.png")
+                    plt.savefig(image_path)
+                    plt.close
+                    
+
                     # b += 1
                     pass
                 pass
@@ -247,6 +272,10 @@ Expanded_Area_Ratios = [0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0
 Pitch_ratios = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5]
 velocities = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 J_vals = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.35, 1.4, 1.45, 1.5, 1.55]
+
+folder_path = "Kt_Kq_Generation"
+os.makedirs(folder_path, exist_ok= True)
+
 
 # Compute
 Kt_vals, Kq_vals, eta_vals = compute_Kt_Kq_eta(KT_terms, KQ_terms, J_vals, Pitch_ratios, Expanded_Area_Ratios, z, velocities)
