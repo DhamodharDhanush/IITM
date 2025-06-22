@@ -10,6 +10,11 @@ from matplotlib.ticker import AutoMinorLocator
 import math
 import psutil
 
+# 4th stage 3 parameters are: 
+#  {'AE_AO_opt': np.float64(0.8999999999999999), 'D_P_opt': np.float64(3.434442079873456), 'pitch_ratio_opt': np.float64(0.725), 'P_i_opt': np.float64(2.4899705079082555), 'V_max': np.float64(7.22753613445378), 'eta_O_at_V_max': np.float64(0.19670998837701642), 'J_ratio': np.float64(0.5304347826086957), 'soln_attained': True}
+# 4th stage 4 parameters are: 
+#  {'n_P': np.float64(5.784790164662915), 'P_E': np.float64(16656347.27458531), 'BHP': np.float64(16205241.954303367), 'consistent': np.False_, 'rel_diff_n': np.float64(0.3421019977664722)}
+# tolerance is acheived at the 4 run
 
 
 def delta_Kt(J, P_D, AE_A0, z, Re_n):
@@ -105,16 +110,14 @@ def Kq_base(KQ_terms, J, P_D, AE_A0, z):
         val += C[d] * (J**s[d]) * (P_D**t[d]) * (AE_A0**u[d]) * (z**v[d])
     return val
 
-
-
-def process_config(Kt_Terms, Kq_Terms, J, velocity, blades, area_ratio, pitch_ratio, b, diameter=0.24):
+def process_config(Kt_Terms, Kq_Terms, J, velocity, blades, area_ratio, pitch_ratio, b, diameter, RPM):
     """
     Compute Kt, Kq, efficiency for one configuration,
     save Excel and PNG with proper closing and sub-grids.
     """
     # Prepare folder
     sub_folder = os.path.join(
-        "Kt_Kq_Generation",
+        "Kt_Kq_Generation_test",
         f"Velocity_{velocity}_m_s",
         f"{blades}_blades",
         f"AE_AO_{area_ratio}",
@@ -122,14 +125,14 @@ def process_config(Kt_Terms, Kq_Terms, J, velocity, blades, area_ratio, pitch_ra
     )
     os.makedirs(sub_folder, exist_ok=True)
 
-    Kt_vals, Kq_vals, eff_vals, J_values = [], [], [], []
+    Kt_vals, Kq_vals, eff_vals, J_values, velocity_vals = [], [], [], [], []
 
     # Loop over J values
-    for J_val in J:
-        if J_val == 0:
-            RPM = 0
-        else:
-            RPM = velocity / (J_val * diameter)
+    for i in range(0, 1001):
+        
+        vel =  ((math.floor(velocity) + 10) * i / 1000) 
+        J_val = vel / (RPM * diameter)
+            
         # chord length based on blade count
         if blades == 3:
             chord = 2.1475 * (diameter / blades) * area_ratio
@@ -163,6 +166,7 @@ def process_config(Kt_Terms, Kq_Terms, J, velocity, blades, area_ratio, pitch_ra
             Kq_vals.append(Kq)
             eff_vals.append(eta0)
             J_values.append(J_val)
+            velocity_vals.append(vel)
             # print(f"{b} Re = {Re} Kt = {Kt} Kq = {Kq} efficiency = {OWE} chord length = {chord_length} Rpm = {RPM} advance coefficient = {advance_coefficient} Pitch ratio = {pitch_ratio} Expanded area Ratio = {Expanded_Area_Ratio} blades = {number_of_blades} Velocity = {velocity}")
             
             print(f"{b} advance coefficient = {J_val} Pitch ratio = {pitch_ratio} Expanded area Ratio = {area_ratio} blades = {blades} Velocity = {velocity}")
@@ -177,6 +181,7 @@ def process_config(Kt_Terms, Kq_Terms, J, velocity, blades, area_ratio, pitch_ra
         Kq_vals.append(Kq)
         eff_vals.append(eta0)
         J_values.append(J_val)
+        velocity_vals.append(vel)
 
         b+= 1
 
@@ -187,9 +192,9 @@ def process_config(Kt_Terms, Kq_Terms, J, velocity, blades, area_ratio, pitch_ra
 
     # Plot with sub-grids
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(J_values, Kt_vals, label=f"K_t (P/D={pitch_ratio}, AE/A0={area_ratio}, z={blades})")
-    ax.plot(J_values, Kq_vals, label=f"K_q (P/D={pitch_ratio}, AE/A0={area_ratio}, z={blades})")
-    ax.plot(J_values, eff_vals, label=f"η₀ (P/D={pitch_ratio}, AE/A0={area_ratio}, z={blades})")
+    ax.plot(velocity_vals, Kt_vals, label=f"K_t (P/D={pitch_ratio}, AE/A0={area_ratio}, z={blades})")
+    ax.plot(velocity_vals, Kq_vals, label=f"K_q (P/D={pitch_ratio}, AE/A0={area_ratio}, z={blades})")
+    ax.plot(velocity_vals, eff_vals, label=f"η₀ (P/D={pitch_ratio}, AE/A0={area_ratio}, z={blades})")
 
     # Labels
     ax.set_xlabel("Advance coefficient J")
@@ -217,10 +222,7 @@ def process_config(Kt_Terms, Kq_Terms, J, velocity, blades, area_ratio, pitch_ra
 
     return b
 
-
-def compute_Kt_Kq_eta_batched(J, P_D, AE_A0, z, V, b, batch_size=1000):
-
-    KT_terms = {
+KT_terms = {
             "C" : [0.00880496, -0.204554, 0.166351, 0.158114, -0.147581, -0.481497, 0.415437, 0.0144043, -0.0530054, 0.0143481, 0.0606826, -0.0125894, 0.0109689, -0.133698, 
                  0.00638407, -0.00132718, 0.168496, -0.0507214, 0.0854559, -0.0504475, 0.010465, -0.00648272, -0.00841728, 0.0168424, -0.00102296, -0.0317791, 0.018604, 
                  -0.00410798, -0.000606848, -0.0049819, 0.0025983, -0.000560528, -0.00163652, -0.000328787, 0.000116502, 0.000690904, 0.00421749, 5.65229e-05, -0.00146564], 
@@ -235,49 +237,30 @@ def compute_Kt_Kq_eta_batched(J, P_D, AE_A0, z, V, b, batch_size=1000):
             }
 
 
-    KQ_terms = {
-            "C" : [0.00379368, 0.00886523, -0.032241, 0.00344778, -0.0408811, -0.108009, -0.0885381, 0.188561, -0.00370871, 0.00513696, 0.0209449, 0.00474319, -0.00723408, 
-                   0.00438388, -0.0269403, 0.0558082, 0.0161886, 0.00318086, 0.015896, 0.0471729, 0.0196283, -0.0502782, -0.030055, 0.0417122, -0.0397722, -0.00350024, 
-                   -0.0106854, 0.00110903, -0.000313912, 0.0035985, -0.00142121, -0.00383637, 0.0126803, -0.00318278, 0.00334268, -0.00183491, 0.000112451, -2.97228e-05, 
-                   0.000269551, 0.00082365, 0.00155334, 0.000302683, -0.0001843, -0.000425399, 8.69243e-05, -0.0004659, 5.54194e-05], 
-            "s" : [0, 2, 1, 0, 0, 1, 2, 0, 1, 0, 1, 2, 2, 1, 0, 3, 0, 1, 0, 1, 3, 0, 3, 2, 0, 0, 3, 3, 0, 3, 0, 1, 0, 2, 0, 1, 3, 3, 1, 2, 0, 0, 0, 0, 3, 0, 1],
-            "t" : [0, 0, 1, 2, 1, 1, 1, 2, 0, 1, 1, 1, 0, 1, 2, 0, 3, 3, 0, 0, 0, 1, 1, 2, 3, 6, 0, 3, 6, 0, 6, 0, 2, 3, 6, 1, 2, 6, 0, 0, 2, 6, 0, 3, 3, 6, 6],
-            "u" : [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 1, 1, 2, 2, 2, 2, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2],
-            "v" : [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]           
-            }
+KQ_terms = {
+        "C" : [0.00379368, 0.00886523, -0.032241, 0.00344778, -0.0408811, -0.108009, -0.0885381, 0.188561, -0.00370871, 0.00513696, 0.0209449, 0.00474319, -0.00723408, 
+                0.00438388, -0.0269403, 0.0558082, 0.0161886, 0.00318086, 0.015896, 0.0471729, 0.0196283, -0.0502782, -0.030055, 0.0417122, -0.0397722, -0.00350024, 
+                -0.0106854, 0.00110903, -0.000313912, 0.0035985, -0.00142121, -0.00383637, 0.0126803, -0.00318278, 0.00334268, -0.00183491, 0.000112451, -2.97228e-05, 
+                0.000269551, 0.00082365, 0.00155334, 0.000302683, -0.0001843, -0.000425399, 8.69243e-05, -0.0004659, 5.54194e-05], 
+        "s" : [0, 2, 1, 0, 0, 1, 2, 0, 1, 0, 1, 2, 2, 1, 0, 3, 0, 1, 0, 1, 3, 0, 3, 2, 0, 0, 3, 3, 0, 3, 0, 1, 0, 2, 0, 1, 3, 3, 1, 2, 0, 0, 0, 0, 3, 0, 1],
+        "t" : [0, 0, 1, 2, 1, 1, 1, 2, 0, 1, 1, 1, 0, 1, 2, 0, 3, 3, 0, 0, 0, 1, 1, 2, 3, 6, 0, 3, 6, 0, 6, 0, 2, 3, 6, 1, 2, 6, 0, 0, 2, 6, 0, 3, 3, 6, 6],
+        "u" : [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 1, 1, 2, 2, 2, 2, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2],
+        "v" : [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]           
+        }
 
-    """
-    Batch processing of configurations to limit memory usage.
-    """
-    # All configurations as tuples
-    configs = list(product(V, z, AE_A0, P_D))
-    total = len(configs)
-    for start in range(0, total, batch_size):
-        end = min(start + batch_size, total)
-        batch = configs[start:end]
-        print(f"Processing batch {start+1}-{end} of {total}")
+# 4th stage 3 parameters are: 
+#  {'AE_AO_opt': np.float64(0.8999999999999999), 'D_P_opt': np.float64(3.434442079873456), 'pitch_ratio_opt': np.float64(0.725), 'P_i_opt': np.float64(2.4899705079082555), 'V_max': np.float64(7.22753613445378), 'eta_O_at_V_max': np.float64(0.19670998837701642), 'J_ratio': np.float64(0.5304347826086957), 'soln_attained': True}
+# 4th stage 4 parameters are: 
+#  {'n_P': np.float64(5.784790164662915), 'P_E': np.float64(16656347.27458531), 'BHP': np.float64(16205241.954303367), 'consistent': np.False_, 'rel_diff_n': np.float64(0.3421019977664722)}
+# tolerance is acheived at the 4 run
 
-        for velocity, blades, area_ratio, pitch_ratio in batch:
-            b = process_config(KT_terms, KQ_terms, J, velocity, blades, area_ratio, pitch_ratio, b)
-
-        # Optional: checkpoint
-        with open("last_completed_batch.txt", "w") as ck:
-            ck.write(str(end))
-
-    print("All batches completed.")
-    return 0, 0, 0
-
-
-
+area_ratio = 0.8999999999999999
+diameter = 3.434442079873456
+n_p = 5.784790164662915
+velocity = 7.22753613445378 * 0.5144
+blades = 4
+pitch_ratio = 0.725
 b = 1
-z = [3, 4, 5, 6, 7]
-Expanded_Area_Ratios = [0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05]
-Pitch_ratios = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5]
-velocities = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-J_vals = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.35, 1.4, 1.45, 1.5, 1.55]
-
-folder_path = "Kt_Kq_Generation"
-os.makedirs(folder_path, exist_ok= True)
 
 
-Kt_vals, Kq_vals, eta_vals = compute_Kt_Kq_eta_batched(J_vals, Pitch_ratios, Expanded_Area_Ratios, z, velocities, b)
+b = process_config(KT_terms, KQ_terms, (velocity / (n_p * diameter)), velocity, blades, area_ratio, pitch_ratio, b, diameter, n_p)
