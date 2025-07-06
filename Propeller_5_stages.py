@@ -135,7 +135,8 @@ def find_best_J_eta(P_E, n_P, rho, V, AE_AO, pitch_ratio,
                 vel_075 = n_P * D_P * ((J_mid**2 + (0.75 * 22 / 7)**2)**0.5)
                 Re = vel_075 * chord / (1.0038e-6)
 
-                dKq = delta_Kq(J_mid, pitch_ratio, AE_AO, z, Re)
+                if Re > 2000000:
+                    dKq = delta_Kq(J_mid, pitch_ratio, AE_AO, z, Re)
 
                 Kq_mid = Kq + dKq
 
@@ -151,7 +152,9 @@ def find_best_J_eta(P_E, n_P, rho, V, AE_AO, pitch_ratio,
 
             # now J_mid is a root; get its eta by linear interp on eta_O_array
             Kt = Kt_base(J_mid, pitch_ratio, AE_AO, z)
-            dKt = delta_Kt(J_mid, pitch_ratio, AE_AO, z, Re)
+            dKt = 0
+            if Re > 2000000:
+                dKt = delta_Kt(J_mid, pitch_ratio, AE_AO, z, Re)
             Kt_mid = Kt + dKt
 
             eta_mid = (J_mid / (2 * 22 / 7)) * (Kt_mid / Kq_mid)
@@ -162,7 +165,8 @@ def find_best_J_eta(P_E, n_P, rho, V, AE_AO, pitch_ratio,
                 best_Kt = Kt_mid
                 best_Kq = Kq_mid
 
-    return best_J, best_eta, best_Kt, best_Kq
+    # print(best_J,  (V / (D_P * n_P)))
+    return best_J, best_eta, best_Kt, best_Kq, D_P
 
 # 2) Then wrap your pitch‐loop in another njit’d function
 @njit(fastmath=True)
@@ -191,7 +195,7 @@ def optimize_for_one_AE_V2(P_E, n_P, rho, V_A, AE_AO,
         # For illustration, assume a function fill_open_water(...)
         Kq_arr, J_array_best = prop_map_diameter(V_A, z, AE_AO, pitch, 1, n_P)
 
-        J_root, eta_root, Kt, Kq = find_best_J_eta(P_E, n_P, rho, V_A, AE_AO, pitch,                                                                                                      
+        J_root, eta_root, Kt, Kq, D_P = find_best_J_eta(P_E, n_P, rho, V_A, AE_AO, pitch,                                                                                                      
                                                     J_array_best, Kq_arr)
 
         Kt_map[area_index, velocity_index, pi]  = Kt
@@ -204,13 +208,15 @@ def optimize_for_one_AE_V2(P_E, n_P, rho, V_A, AE_AO,
             best_overall_pitch = pitch
             best_Kt            = Kt
             best_Kq            = Kq
+            best_V_A           = V_A
+            best_D_P           = D_P
 
     return best_overall_J, best_overall_eta, best_overall_pitch, best_Kt, best_Kq, Kt_map, Kq_map, eta_map
 
 @njit(fastmath=True)
 def prop_map_diameter(V, z, AE, pitch, d, n_P):
     #J_array, V_A, z, AE_AO, pitch_ratio, 1, n_P
-    J_array_prop = np.linspace(0.0, 1.6, 161)
+    J_array_prop = np.linspace(0.1, 1.6, 160)
     return open_water_data_diameter(J_array_prop, V, z, AE, pitch, d, n_P)
 
 @njit(fastmath=True)
@@ -702,7 +708,6 @@ def optimize_dimensions(V_service,
 
     start_time = time.time()
 
-    term_width = shutil.get_terminal_size((120, 20)).columns
     for i in range(len(AE_AO_array)):
         
         AE_AO = area_ratio_array[i]
@@ -728,8 +733,8 @@ def optimize_dimensions(V_service,
             J_root, eta_root, pitch_ratio, Kt_root, Kq_root, Kt_map, Kq_map, eta_map = optimize_for_one_AE_V2(P_E, n_P, rho, V_A, AE_AO,
                           J_array, z, i, j, Kt_map, Kq_map, eta_map)
             
+            
             D_P = V_A / (n_P * J_root)
-
             T_P = rho * n_P**2 * D_P**4 * Kt_root
 
             # print("T_P, T_Requie4ed:", T_P, T_required)
@@ -786,7 +791,7 @@ def optimize_dimensions(V_service,
                     gc.collect()
                     continue
 
-                if eta_root > best['eta_O_at_V_max']:
+                if V > best['V_max']:
                     best = {
                         'AE_AO_opt': AE_AO,
                         'D_P_opt': D_P,
@@ -836,7 +841,7 @@ def optimize_dimensions(V_service,
     print("Total Time:", str(timedelta(seconds=int(final_time))))
 #--------------------------------------------------------------------------------------------------------
 
-    if best['eta_O_at_V_max'] < 0:
+    if best['V_max'] < 0:
         print(f"v-max: {best['V_max']}")
         print(f"No feasible geometry found in Stage 3. Check scanning ranges or inputs." \
         f"\n with this AE ratios, new ae ratios limits are found {AE_AO_limits}")
